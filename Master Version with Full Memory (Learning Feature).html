@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Professional Dispatch Generator</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #eceff1; padding: 20px; margin: 0; }
+        .form-card { background: white; max-width: 900px; margin: 20px auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); position: relative; }
+        .upload-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #cfd8dc; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.8rem; color: #546e7a; margin-bottom: 5px; font-weight: 600; }
+        input, select { width: 100%; padding: 10px; border: 1.5px solid #cfd8dc; border-radius: 6px; box-sizing: border-box; }
+        .combined-input { display: flex; gap: 5px; }
+        .hrs-input { width: 70px !important; text-align: center; font-weight: bold; background: #fffde7; }
+        .btn-container { display: flex; gap: 15px; margin-top: 20px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
+        .btn-dl { background: #263238; }
+        .btn-dl:hover { background: #455a64; }
+
+        /* Login Overlay */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #263238; display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; width: 320px; text-align: center; }
+        .login-box input { margin-bottom: 15px; font-size: 1rem; }
+        .logout-btn { background: #ff5252; width: auto; padding: 8px 15px; font-size: 0.8rem; flex: none; margin-right: 45px;}
+
+        /* Gear Icon & Side Menu */
+        .gear-btn { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 24px; color: #546e7a; transition: transform 0.3s; }
+        .gear-btn:hover { transform: rotate(90deg); color: #2196f3; }
+
+        .settings-sidebar { position: fixed; top: 0; right: -350px; width: 320px; height: 100%; background: white; box-shadow: -5px 0 15px rgba(0,0,0,0.1); transition: 0.4s; z-index: 1000; padding: 25px; box-sizing: border-box; overflow-y: auto; }
+        .settings-sidebar.active { right: 0; }
+        .close-settings { cursor: pointer; font-size: 18px; float: left; margin-bottom: 20px; color: #546e7a; font-weight: bold; }
+
+        .history-list { margin-top: 15px; max-height: 250px; overflow-y: auto; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 0.85rem; color: #333; }
+        
+        .del-btn { background: transparent; color: #ff5252; border: none; cursor: pointer; font-size: 18px; font-weight: bold; padding: 0; margin-left: auto; transition: 0.2s; }
+        .del-btn:hover { color: #b71c1c; transform: scale(1.2); }
+        
+        .manage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .clear-all-link { color: #ff5252; font-size: 0.7rem; text-decoration: underline; cursor: pointer; font-weight: 600; }
+        
+        #overlay-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: none; z-index: 999; }
+        .mem-status { font-size: 0.65rem; color: #2e7d32; display: block; margin-top: 2px; font-weight: bold; }
+        .btn-wipe { background: #f44336 !important; margin-top: 10px; font-size: 0.8rem !important; padding: 10px !important; }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-box">
+        <h2 style="margin-top:0; color: #263238;">VIJAY SELVA ACCESS</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="accessKey" placeholder="Password">
+        <button onclick="verifyAccess()" style="background: #2196f3; width: 100%; margin-top: 10px;">ENTER SYSTEM</button>
+        <p id="login-error" style="color: red; display: none; font-size: 0.8rem; margin-top: 15px;">❌ WRONG USERNAME OR PASSWORD</p>
+    </div>
+</div>
+
+<div id="overlay-bg" onclick="toggleSettings()"></div>
+
+<div id="settingsSidebar" class="settings-sidebar">
+    <span class="close-settings" onclick="toggleSettings()">✕</span>
+    <h2 style="clear:both; margin-top:10px; font-size: 1.2rem;">Settings & History</h2>
+    <div class="input-group">
+        <div class="manage-header">
+            <label style="margin-bottom:0;">Manage Lists</label>
+            <span class="clear-all-link" onclick="clearAllHistory()">Clear All</span>
+        </div>
+        <select id="manage-select" onchange="showHistoryList()">
+            <option value="bulkPermit">Bulk Permit No</option>
+            <option value="dispatchSlip">Dispatch Slip No</option>
+            <option value="serialNo">Serial No</option>
+            <option value="vehicleNo">Vehicle No</option>
+            <option value="vehicleType">Vehicle Type</option>
+            <option value="distance">Total Distance</option>
+            <option value="qty">Quantity (MT)</option>
+            <option value="driverName">Driver Name</option>
+            <option value="phone">Driver Phone</option>
+            <option value="license">License No</option>
+            <option value="deliveredTo">Delivered To</option>
+            <option value="lease">Lease Period</option>
+            <option value="address">Destination Address</option>
+            <option value="via">Via</option>
+        </select>
+    </div>
+    <div id="history-display-list" class="history-list"></div>
+    
+    <div style="margin-top: 30px; border-top: 2px solid #eceff1; padding-top: 20px;">
+        <h3 style="font-size: 1rem;">System Memory</h3>
+        <button style="background:#607d8b; color:white; width:100%; padding:10px; margin-bottom:10px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="exportData()">💾 Save Backup (.json)</button>
+        <button style="background:#607d8b; color:white; width:100%; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="document.getElementById('importFile').click()">📂 Load Backup File</button>
+        <button class="btn-wipe" onclick="clearFileMemory()">🗑️ Wipe File Memory</button>
+        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+        <p style="font-size: 0.65rem; color: #999; margin-top: 10px;">Wiping file memory will force you to re-upload PDF and Fonts.</p>
+    </div>
+</div>
+
+<div class="form-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0">Dispatch Slip Entry</h2>
+        <div style="display:flex; align-items:center;">
+            <button class="logout-btn" onclick="logout()">Logout</button>
+            <span class="gear-btn" onclick="toggleSettings()">⚙️</span>
+        </div>
+    </div>
+
+    <div class="upload-section">
+        <div><label>1. TEMPLATE PDF</label><input type="file" id="pdfFile" accept=".pdf" onchange="saveFile('pdfFile', 'saved_pdf')"><span id="status-pdfFile" class="mem-status"></span></div>
+        <div><label>2. MAIN FONT</label><input type="file" id="fontFile" accept=".ttf" onchange="saveFile('fontFile', 'saved_font')"><span id="status-fontFile" class="mem-status"></span></div>
+        <div><label>3. SERIAL FONT</label><input type="file" id="italicFontFile" accept=".ttf" onchange="saveFile('italicFontFile', 'saved_italic')"><span id="status-italicFontFile" class="mem-status"></span></div>
+    </div>
+
+    <div class="grid-3">
+        <div class="input-group"><label>Bulk Permit No</label><input type="text" id="bulkPermit" list="list-bulkPermit" class="input-field"></div>
+        <div class="input-group"><label>Dispatch Slip No</label><input type="text" id="dispatchSlip" list="list-dispatchSlip" class="input-field"></div>
+        <div class="input-group"><label>Serial No</label><input type="text" id="serialNo" list="list-serialNo" class="input-field"></div>
+        <div class="input-group"><label>Vehicle No</label><input type="text" id="vehicleNo" list="list-vehicleNo" class="input-field"></div>
+        <div class="input-group"><label>Vehicle Type</label><input type="text" id="vehicleType" list="list-vehicleType" class="input-field"></div>
+        <div class="input-group"><label>Total Distance (Kms)</label><input type="text" id="distance" list="list-distance" class="input-field"></div>
+        
+        <div class="input-group"><label>Travelling Date & Time</label><input type="datetime-local" id="travelDate" class="input-field" onchange="calculateRequiredTime()"></div>
+        <div class="input-group">
+            <label>Required Time (Hrs & Date)</label>
+            <div class="combined-input">
+                <input type="number" id="manualHrs" placeholder="Hrs" class="hrs-input input-field" oninput="calculateRequiredTime()">
+                <input type="datetime-local" id="reqDate" class="input-field">
+            </div>
+        </div>
+        <div class="input-group"><label>Quantity (MT)</label><input type="text" id="qty" list="list-qty" class="input-field"></div>
+        
+        <div class="input-group"><label>Driver Name</label><input type="text" id="driverName" list="list-driverName" class="input-field"></div>
+        <div class="input-group"><label>Driver Phone</label><input type="text" id="phone" list="list-phone" class="input-field"></div>
+        <div class="input-group"><label>License No</label><input type="text" id="license" list="list-license" class="input-field"></div>
+    </div>
+    
+    <div class="grid-3">
+        <div style="grid-column: span 2"><label>Delivered To</label><input type="text" id="deliveredTo" list="list-deliveredTo" class="input-field"></div>
+        <div><label>Lease Period</label><input type="text" id="lease" list="list-lease" class="input-field"></div>
+    </div>
+    <div class="grid-3">
+        <div style="grid-column: span 2"><label>Destination Address</label><input type="text" id="address" list="list-address" class="input-field"></div>
+        <div><label>Via</label><input type="text" id="via" list="list-via" class="input-field"></div>
+    </div>
+    <div class="input-group"><label>Date & Time of Dispatch</label><input type="datetime-local" id="dispatchTime" step="1" class="input-field"></div>
+
+    <div class="btn-container">
+        <button id="downloadBtn" class="btn-dl" onclick="generate()">Download PDF</button>
+    </div>
+</div>
+
+<datalist id="list-bulkPermit"></datalist>
+<datalist id="list-dispatchSlip"></datalist>
+<datalist id="list-serialNo"></datalist>
+<datalist id="list-vehicleNo"></datalist>
+<datalist id="list-vehicleType"></datalist>
+<datalist id="list-distance"></datalist>
+<datalist id="list-qty"></datalist>
+<datalist id="list-driverName"></datalist>
+<datalist id="list-phone"></datalist>
+<datalist id="list-license"></datalist>
+<datalist id="list-deliveredTo"></datalist>
+<datalist id="list-lease"></datalist>
+<datalist id="list-address"></datalist>
+<datalist id="list-via"></datalist>
+
+<script>
+    const AUTH = { user: "vijayselva", pass: "V@#8596" }; 
+    const MEMORY_FIELDS = ['bulkPermit', 'dispatchSlip', 'serialNo', 'vehicleNo', 'vehicleType', 'distance', 'qty', 'driverName', 'phone', 'license', 'deliveredTo', 'lease', 'address', 'via'];
+    
+    let db;
+    const dbReq = indexedDB.open("FileStorage", 1);
+    dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("files"); };
+    dbReq.onsuccess = (e) => { db = e.target.result; loadFilesFromMemory(); };
+
+    function saveFile(inputID, key) {
+        const file = document.getElementById(inputID).files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            db.transaction("files", "readwrite").objectStore("files").put(reader.result, key);
+            document.getElementById('status-' + inputID).innerText = "✅ Saved to memory";
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    async function getFile(key) {
+        return new Promise((res) => {
+            const req = db.transaction("files").objectStore("files").get(key);
+            req.onsuccess = () => res(req.result);
+        });
+    }
+
+    async function loadFilesFromMemory() {
+        if(await getFile('saved_pdf')) document.getElementById('status-pdfFile').innerText = "✅ Loaded from memory";
+        if(await getFile('saved_font')) document.getElementById('status-fontFile').innerText = "✅ Loaded from memory";
+        if(await getFile('saved_italic')) document.getElementById('status-italicFontFile').innerText = "✅ Loaded from memory";
+    }
+
+    function clearFileMemory() {
+        if(confirm("Confirm: Delete saved Template and Fonts from memory?")) {
+            const tx = db.transaction("files", "readwrite");
+            tx.objectStore("files").clear();
+            tx.oncomplete = () => { alert("Memory Cleared. Please refresh."); location.reload(); };
+        }
+    }
+
+    window.onload = () => {
+        if (sessionStorage.getItem("isAuthorized") === "true") document.getElementById('login-overlay').style.display = 'none';
+        loadAllHistory(); showHistoryList(); setupEnterKey();
+    };
+
+    function toggleSettings() {
+        const s = document.getElementById('settingsSidebar');
+        const b = document.getElementById('overlay-bg');
+        s.classList.toggle('active');
+        b.style.display = s.classList.contains('active') ? 'block' : 'none';
+    }
+
+    function calculateRequiredTime() {
+        const t = document.getElementById('travelDate').value;
+        const h = document.getElementById('manualHrs').value;
+        if (t && h) {
+            const d = new Date(new Date(t).getTime() + (parseFloat(h) * 3600000));
+            const pad = (n) => String(n).padStart(2,'0');
+            document.getElementById('reqDate').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+    }
+
+    function exportData() {
+        let b = {}; MEMORY_FIELDS.forEach(f => b[f] = JSON.parse(localStorage.getItem('hist_'+f)||"[]"));
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(b)], {type:"application/json"}));
+        a.download = `Backup_${new Date().toLocaleDateString()}.json`; a.click();
+    }
+
+    function importData(e) {
+        const r = new FileReader();
+        r.onload = (ev) => {
+            const d = JSON.parse(ev.target.result);
+            Object.keys(d).forEach(f => {
+                let c = [...new Set([...JSON.parse(localStorage.getItem('hist_'+f)||"[]"), ...d[f]])];
+                localStorage.setItem('hist_'+f, JSON.stringify(c));
+            });
+            loadAllHistory(); showHistoryList(); alert("Data Merged!");
+        };
+        r.readAsText(e.target.files[0]);
+    }
+
+    function setupEnterKey() {
+        const flds = document.querySelectorAll('.input-field');
+        flds.forEach((f, i) => f.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); if(flds[i+1]) flds[i+1].focus(); else generate(); }
+        }));
+    }
+
+    function verifyAccess() {
+        if (document.getElementById('username').value === AUTH.user && document.getElementById('accessKey').value === AUTH.pass) {
+            sessionStorage.setItem("isAuthorized", "true"); document.getElementById('login-overlay').style.display = 'none';
+        } else document.getElementById('login-error').style.display = 'block';
+    }
+
+    function logout() { sessionStorage.removeItem("isAuthorized"); location.reload(); }
+
+    function loadAllHistory() {
+        MEMORY_FIELDS.forEach(f => {
+            const l = document.getElementById('list-'+f); l.innerHTML = "";
+            JSON.parse(localStorage.getItem('hist_'+f)||"[]").forEach(v => {
+                let o = document.createElement('option'); o.value = v; l.appendChild(o);
+            });
+        });
+    }
+
+    function showHistoryList() {
+        const f = document.getElementById('manage-select').value;
+        const h = JSON.parse(localStorage.getItem('hist_'+f)||"[]");
+        const c = document.getElementById('history-display-list');
+        c.innerHTML = h.length ? "" : "<div style='padding:15px; text-align:center; color:#999;'>Empty</div>";
+        h.forEach((v, i) => {
+            const d = document.createElement('div'); d.className = 'history-item';
+            d.innerHTML = `<span>${v}</span><button class="del-btn" onclick="removeItem('${f}', ${i})">✕</button>`;
+            c.appendChild(d);
+        });
+    }
+
+    function removeItem(f, i) {
+        let h = JSON.parse(localStorage.getItem('hist_'+f)||"[]"); h.splice(i, 1);
+        localStorage.setItem('hist_'+f, JSON.stringify(h)); loadAllHistory(); showHistoryList();
+    }
+
+    function clearAllHistory() {
+        if(confirm("Clear this list?")) {
+            localStorage.setItem('hist_'+document.getElementById('manage-select').value, "[]");
+            loadAllHistory(); showHistoryList();
+        }
+    }
+
+    function saveToHistory() {
+        MEMORY_FIELDS.forEach(f => {
+            const v = document.getElementById(f).value.trim();
+            if (!v) return;
+            let h = JSON.parse(localStorage.getItem('hist_'+f)||"[]");
+            if (!h.includes(v)) { h.push(v); localStorage.setItem('hist_'+f, JSON.stringify(h)); }
+        });
+        loadAllHistory();
+    }
+
+    function formatWithAMPM(val) {
+        if (!val) return " "; const d = new Date(val);
+        const pad = (n) => String(n).padStart(2,'0');
+        let h = d.getHours(); const ampm = h >= 12 ? 'pm' : 'am';
+        h = h % 12 || 12;
+        return `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()} ${pad(h)}:${pad(d.getMinutes())} ${ampm}`;
+    }
+
+    function formatNoAMPM(val, sec = true) {
+        if (!val) return " "; const d = new Date(val);
+        const pad = (n) => String(n).padStart(2,'0');
+        let res = `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()} ${pad(d.getHours() % 12 || 12)}:${pad(d.getMinutes())}`;
+        return sec ? res + ":" + pad(d.getSeconds()) : res;
+    }
+
+    async function generate() {
+        let pB = document.getElementById('pdfFile').files[0] ? await document.getElementById('pdfFile').files[0].arrayBuffer() : await getFile('saved_pdf');
+        let fB = document.getElementById('fontFile').files[0] ? await document.getElementById('fontFile').files[0].arrayBuffer() : await getFile('saved_font');
+        let iB = document.getElementById('italicFontFile').files[0] ? await document.getElementById('italicFontFile').files[0].arrayBuffer() : await getFile('saved_italic');
+
+        if (!pB || !fB || !iB) return alert("Missing Files! Upload them once.");
+
+        try {
+            const { PDFDocument, rgb } = PDFLib;
+            const doc = await PDFDocument.load(pB);
+            doc.registerFontkit(fontkit);
+            const mF = await doc.embedFont(fB);
+            const iF = await doc.embedFont(iB);
+            const page = doc.getPages()[0];
+            const fX = (x) => parseFloat(x) * 0.5, fY = (y) => parseFloat(y) * 0.5; 
+            const val = (id) => document.getElementById(id).value || "";
+            const st = { font: mF, size: 7, color: rgb(0, 0, 0) };
+            
+            saveToHistory();
+            page.drawText(val('bulkPermit'), { x: fX(476), y: fY(1259), ...st });
+            page.drawText(val('dispatchSlip'), { x: fX(369), y: fY(1199), ...st });
+            page.drawText(val('deliveredTo'), { x: fX(369), y: fY(1169), ...st });
+            page.drawText(val('vehicleNo'), { x: fX(369), y: fY(1139), ...st });
+            page.drawText(val('vehicleType'), { x: fX(369), y: fY(1108), ...st });
+            page.drawText(val('distance'), { x: fX(369), y: fY(1078), ...st });
+            page.drawText(formatWithAMPM(val('travelDate')), { x: fX(369), y: fY(1046), ...st });
+            page.drawText(`${val('manualHrs')}hrs (${formatWithAMPM(val('reqDate'))})`, { x: fX(369), y: fY(1017), ...st });
+            page.drawText(formatNoAMPM(val('dispatchTime'), true), { x: fX(947), y: fY(1455), ...st });
+            page.drawText(val('qty'), { x: fX(369), y: fY(988), ...st });
+            page.drawText(val('license'), { x: fX(369), y: fY(957), ...st });
+            page.drawText(val('phone'), { x: fX(369), y: fY(927), ...st });
+            page.drawText(val('driverName'), { x: fX(847), y: fY(987), ...st });
+            page.drawText(val('via'), { x: fX(847), y: fY(957), ...st });
+            page.drawText(val('address'), { x: fX(610), y: fY(1107), ...st });
+            page.drawText(val('lease'), { x: fX(847), y: fY(1228), ...st });
+            
+            // SERIAL COLOR GREY RESTORED
+            page.drawText(val('serialNo'), { x: fX(917), y: fY(1430), size: 7, font: iF, color: rgb(0.5, 0.5, 0.5) });
+
+            const qrT = `${val('serialNo')},${val('dispatchSlip')},CUDN0053,${formatNoAMPM(val('travelDate'), false)},${val('distance')}kms,${val('manualHrs')}hrs,Earth(${val('qty')}MT),${val('vehicleNo')},${val('address')}`;
+            const qrU = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrT)}`;
+            const qrI = await doc.embedPng(await (await fetch(qrU)).arrayBuffer());
+            page.drawImage(qrI, { x: fX(1006), y: fY(1480), width: 37, height: 37 });
+
+            const o = await doc.save();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([o], {type:'application/pdf'})); a.download = "Permit.pdf"; a.click();
+        } catch (e) { alert("Error: " + e.message); }
+    }
+</script>
+</body>
+</html>
